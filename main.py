@@ -5,7 +5,6 @@ from PIL import Image
 from io import BytesIO
 import os
 import requests
-import gdown
 import shutil
 from dotenv import load_dotenv
 
@@ -13,7 +12,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Download and unzip model from Hugging Face
 model_url = 'https://huggingface.co/spaces/pradeesh11/Brain-tumor-prediction/resolve/main/brain_tumor_model_savedmodel.zip'
 model_zip = '/tmp/model.zip'
 model_path = '/tmp/brain_tumor_model_savedmodel'
@@ -21,19 +19,37 @@ model_path = '/tmp/brain_tumor_model_savedmodel'
 try:
     if not os.path.exists(model_path):
         os.makedirs(os.path.dirname(model_zip), exist_ok=True)
-        gdown.download(model_url, model_zip, quiet=False)
+        print("📦 Downloading model from Hugging Face...")
+
+        response = requests.get(model_url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to download model. Status code: {response.status_code}")
+
+        with open(model_zip, 'wb') as f:
+            f.write(response.content)
+
         shutil.unpack_archive(model_zip, '/tmp')
+        print("✅ Model downloaded and extracted.")
 except Exception as e:
-    print(f"Error downloading or unzipping model: {e}")
+    print(f"❌ Error downloading or unzipping model: {e}")
     raise
 
+# ----------------------
 # Load the TensorFlow model
+# ----------------------
+
 try:
     model = tf.saved_model.load(model_path)
     infer = model.signatures["serving_default"]
+    print("✅ Model loaded successfully.")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    print(f"❌ Error loading model: {e}")
     raise
+
+
+# ----------------------
+# Image preprocessing and prediction
+# ----------------------
 
 def preprocess_image(image_data, target_size=(256, 256)):
     img = Image.open(BytesIO(image_data)).convert('RGB')
@@ -41,6 +57,7 @@ def preprocess_image(image_data, target_size=(256, 256)):
     img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
     return img_array
+
 
 def predict_image(image_data):
     try:
@@ -53,9 +70,15 @@ def predict_image(image_data):
     except Exception as e:
         return None, f"Prediction error: {str(e)}"
 
+
+# ----------------------
+# Routes
+# ----------------------
+
 @app.route('/')
 def home():
     return render_template('index.html')
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -72,6 +95,7 @@ def predict():
         'probability_of_tumor_yes': round(prob * 100, 2),  # Convert to percentage
         'predicted_class': label
     })
+
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -106,6 +130,11 @@ def chat():
         content = f"Sorry, I couldn't process that. Error: {str(e)}"
 
     return jsonify({"response": content})
+
+
+# ----------------------
+# Start server
+# ----------------------
 
 if __name__ == '__main__':
     app.run(debug=True)
