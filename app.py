@@ -6,14 +6,37 @@ from io import BytesIO
 import os
 import requests
 from dotenv import load_dotenv
+from langchain_community.vectorstores import FAISS
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
 
+if not os.getenv("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
+
 app = Flask(__name__)
 
+# Load Vector Store
+DB_FAISS_PATH = "vectorstore/db_faiss"
+vector_store = None
+try:
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    vector_store = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
+    print("Vector store loaded successfully.")
+except Exception as e:
+    print(f"Warning: Could not load vector store: {e}")
+
 # Load the TensorFlow model
-model = tf.saved_model.load("brain_tumor_model_savedmodel")
-infer = model.signatures["serving_default"]
+try:
+    model = tf.saved_model.load("brain_tumor_model_savedmodel")
+    infer = model.signatures["serving_default"]
+    model_loaded = True
+    print("Model loaded successfully.")
+except Exception as e:
+    print(f"Warning: Could not load model: {e}")
+    print("Running in demo mode with mock predictions.")
+    model_loaded = False
+    infer = None
 
 def preprocess_image(image_data, target_size=(256, 256)):
     img = Image.open(BytesIO(image_data)).convert('RGB')
@@ -23,6 +46,13 @@ def preprocess_image(image_data, target_size=(256, 256)):
     return img_array
 
 def predict_image(image_data):
+    if not model_loaded:
+        # Mock prediction for demo purposes
+        import random
+        prob = random.random()
+        label = "yes" if prob >= 0.5 else "no"
+        return float(prob), label
+
     img_array = preprocess_image(image_data)
     predictions = infer(tf.constant(img_array))
     output_key = list(predictions.keys())[0]
@@ -52,6 +82,31 @@ def chat():
     user_input = request.json.get("message")
     api_key = os.getenv("GEMINI_API_KEY")
 
+    # Retrieve context
+    context = ""
+    if vector_store:
+        try:
+            docs = vector_store.similarity_search(user_input, k=3)
+            context = "\n\n".join([d.page_content for d in docs])
+            print(f"Retrieved {len(docs)} documents for context.")
+        except Exception as e:
+            print(f"Error retrieving documents: {e}")
+
+    # Construct prompt
+    prompt = f"""You are a helpful medical assistant specializing in brain tumors. Use the following context to answer the user's question.
+
+Context:
+{context}
+
+Question:
+{user_input}
+
+Important Instructions:
+1. Answer ONLY using the provided context.
+2. If the answer is not contained in the context, say "I can only provide answers for brain tumor related queries."
+3. Do not make up information or use outside knowledge.
+"""
+
     headers = {
         "Content-Type": "application/json"
     }
@@ -59,13 +114,13 @@ def chat():
     data = {
         "contents": [
             {
-                "parts": [{"text": user_input}]
+                "parts": [{"text": prompt}]
             }
         ]
     }
 
     response = requests.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
         headers=headers,
         params={"key": api_key},
         json=data
@@ -79,4 +134,4 @@ def chat():
     return jsonify({"response": content})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8080)

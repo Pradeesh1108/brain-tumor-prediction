@@ -1,2 +1,15 @@
 .env
 brain_tumor_model_savedmodel/
+vectorstore/
+data/
+__pycache__/
+railway.json
+models.json
+render.yaml
+.venv/
+.env
+Ds_Store
+.vscode/
+.ipynb_checkpoints/
+*.pyc
+documents/
