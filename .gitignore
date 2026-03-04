@@ -13,3 +13,4 @@ Ds_Store
 .ipynb_checkpoints/
 *.pyc
 documents/
+venv312/
