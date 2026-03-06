@@ -1,6 +1,6 @@
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 import glob
@@ -42,8 +42,8 @@ def create_vector_db():
     texts = text_splitter.split_documents(documents)
     print(f"Split into {len(texts)} chunks.")
 
-    print("Generating embeddings...")
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    print("Generating embeddings with local Hugging Face model (all-MiniLM-L6-v2)...")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})
     
     print("Creating vector store...")
     db = FAISS.from_documents(texts, embeddings)

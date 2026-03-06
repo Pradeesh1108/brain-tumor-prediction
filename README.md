@@ -1,41 +1,40 @@
-# 🧠 Brain Tumor Segmentation using ResNet50 + Flask
+# 🧠 Brain Tumor Prediction & RAG Chat Assistant
 
-This project is a deep learning-based brain tumor segmentation system trained using ResNet50. It supports JPEG images and includes a Flask-based web application for real-time tumor segmentation.
+This project is a Flask-based web application that provides two robust features:
+1. **Brain Tumor Segmentation/Prediction & Analysis** using a trained Deep Learning model (ResNet50).
+2. **Interactive RAG Chat Assistant** which leverages a local vector store built on your medical documents and the high-speed Groq API (Llama 3) to answer queries contextually.
 
 ---
 
 ## ✨ Features
 
-- Brain tumor segmentation using ResNet50
-- JPEG image support
-- Deep learning with TensorFlow and Keras
-- Flask web application for easy interaction
-- Compatible with M1 Mac using MPS backend
+- **Brain Tumor Prediction:** Upload a JPEG MRI image to get real-time tumor predictions.
+- **RAG Chatbot:** Ask questions about brain tumors, and the bot will answer strictly based on the provided PDF/DOCX contextual documents.
+- **Local Document Embeddings:** Uses the fast, local Hugging Face `all-MiniLM-L6-v2` model for privacy and zero API costs on ingestion.
+- **Lightning Fast LLM:** Uses the Groq API (`llama-3.3-70b-versatile`) for instant chat text generation.
+- **Flask Web Application:** An easy-to-use GUI for both image prediction and chat interaction.
 
 ---
 
 ## 📁 Folder Structure
 
 ```
-brain-tumor-segmentation/
-├── static/                 # Static files (CSS, JS, outputs)
-│   └── style.css
-│   └── script.js        
-├── templates/              # HTML templates
-│   ├── index.html
-├── data/                   # Dataset folder
-│   ├── images/             # Input MRI images (.jpg)
-├── model/                  # Saved trained models
-│   └── model
-├── app.py                  # Flask application file
-├── training.ipynb          # Jupyter notebook for model training
+brain-tumor-prediction/
+├── static/                 # Static files (CSS, JS)
+├── templates/              # HTML templates (index.html)
+├── documents/              # Place your PDF and DOCX files here for the RAG context
+├── vectorstore/            # Generated FAISS vector database
+├── brain_tumor_model_savedmodel/ # Saved TensorFlow model for image prediction
+├── app.py                  # Flask web server and API endpoints
+├── ingest.py               # Script to convert documents into local embeddings
 ├── requirements.txt        # Python dependencies
-└── README.md               # This documentation file
+├── .env                    # Environment variables (API Keys)
+└── README.md               # Project documentation
 ```
 
 ---
 
-## 🛠️ Installation
+## 🛠️ Installation & Setup
 
 ### 1. Clone the repository
 
@@ -48,7 +47,7 @@ cd brain-tumor-prediction
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
 ```
 
 ### 3. Install the dependencies
@@ -57,84 +56,55 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
----
+### 4. Setup Environment Variables
 
-## 📦 requirements.txt
-
-```text
-tensorflow
-flask
-opencv-python
-numpy
-pillow
-matplotlib
-scikit-learn
-jupyter
-```
-
-For M1 Mac users:
+Create a `.env` file in the root directory and add your API keys:
 
 ```text
-tensorflow-macos
-tensorflow-metal
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
 ---
 
-## 🧪 Model Training
+## 📚 Building the Knowledge Base (RAG)
 
-Train the ResNet50 model using the provided Jupyter notebook.
+Before chatting with the assistant, you need to ingest the knowledge documents:
 
-### 1. Launch the notebook
+1. Place your target `.pdf` or `.docx` files in the `documents/` folder.
+2. Run the ingestion script to create local embeddings:
 
 ```bash
-jupyter notebook training.ipynb
+python3 ingest.py
 ```
-
-### 2. Dataset structure
-
-Make sure your image and mask folders look like this:
-
-```
-data/
-├── images/
-│   ├── image1.jpg
-│   ├── image2.jpg
-│   └── ...
-```
-
-### 3. Run the notebook
-
-- Load and preprocess the data
-- Train the model
-- Save the trained model to `model`
+This will create a `vectorstore/db_faiss` directory containing the local FAISS database.
 
 ---
 
 ## 🚀 Running the Web App
 
-Once the model is trained and saved, launch the Flask app:
+Once your vector store is created and your `.env` is set up, launch the Flask app:
 
 ```bash
 python3 app.py
 ```
 
-The app will run at:
-
+The app will become available at:
 ```
-http://127.0.0.1:5000
+http://127.0.0.1:8080
 ```
 
-### 🖼️ Using the App
+### 🖼️ Using the Application
 
-- Upload a brain MRI image
-- View the predicted tumor result
+- **Image Prediction:** Upload a brain MRI image under the upload tab to view the predicted tumor result.
+- **Chat Assistant:** Use the chat interface to ask context-aware questions. The AI strictly answers based on the files ingested into the `documents/` folder.
+
 ---
 
-## 🧠 Credits
+## 🧠 Technology Stack
 
-- Model Architecture: ResNet50
-- Frameworks: TensorFlow, Flask
-- Frontend: HTML + JS
-
----
+- **Model Architecture:** ResNet50 (TensorFlow)
+- **Framework:** Flask (Python)
+- **Embeddings:** Hugging Face (`sentence-transformers/all-MiniLM-L6-v2`) via LangChain
+- **LLM API:** Groq (`llama-3.3-70b-versatile`) via REST
+- **Vector Store:** FAISS
+- **Frontend:** HTML, Vanilla CSS, Vanilla JS

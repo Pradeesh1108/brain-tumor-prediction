@@ -7,12 +7,9 @@ import os
 import requests
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
-
-if not os.getenv("GOOGLE_API_KEY"):
-    os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
 
 app = Flask(__name__)
 
@@ -20,7 +17,7 @@ app = Flask(__name__)
 DB_FAISS_PATH = "vectorstore/db_faiss"
 vector_store = None
 try:
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})
     vector_store = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
     print("Vector store loaded successfully.")
 except Exception as e:
@@ -80,7 +77,10 @@ def predict():
 @app.route('/chat', methods=['POST'])
 def chat():
     user_input = request.json.get("message")
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
+
+    if not api_key:
+        return jsonify({"response": "Error: GROQ_API_KEY not found in environment."})
 
     # Retrieve context
     context = ""
@@ -108,27 +108,34 @@ Important Instructions:
 """
 
     headers = {
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
 
     data = {
-        "contents": [
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
             {
-                "parts": [{"text": prompt}]
+                "role": "user",
+                "content": prompt
             }
-        ]
+        ],
+        "temperature": 0.5,
+        "max_completion_tokens": 1024,
     }
 
-    response = requests.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-        headers=headers,
-        params={"key": api_key},
-        json=data
-    )
-
     try:
-        content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=data
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"]
     except Exception as e:
+        print(f"Error calling Groq API: {e}")
+        if 'response' in locals() and hasattr(response, 'text'):
+            print(f"Response text: {response.text}")
         content = "Sorry, I couldn't process that. Please try again."
 
     return jsonify({"response": content})
